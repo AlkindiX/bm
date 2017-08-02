@@ -1,0 +1,270 @@
+#!/usr/bin/python3
+import io
+import json
+import os
+import string
+import subprocess
+import sys
+from datetime import datetime
+__version__ = 'v1.0.0'
+__author__ = 'Mohammed Sulieman Alkindi'
+
+
+class TerminalColors(object):
+    NATIVE = '\033[m'  # native
+    RED = '\033[31m'  # red
+    GREEN = '\033[32m'  # green
+    ORANGE = '\033[33m'  # orange
+    BLUE = '\033[34m'  # blue
+    BOLD = '\033[1m'
+
+class TerminalBackColors:
+    NATIVE = '\003[39m'
+    BLACK = '\003[30m'
+    RED = '\003[31m'
+    GREEN = '\003[32m'
+    YELLO = '\003[33m'
+    BLUE = '\003[34m'
+    MAGENTA = '\003[35m'
+    CYAN = '\003[36m'
+    LIGHTGRAY = '\003[37m'
+    DARKGRAY = '\003[90m'
+    LIGHTRED = '\003[91m'
+    LIGHTGREEN = '\003[92m'
+    LIGHTYELLO = '\003[93m'
+    LIGHTBLUE = '\003[94m'
+    LIGHTMAGENTA = '\003[95m'
+    LIGHTCYAN = '\003[96m'
+    WHITE = '\003[97m'
+
+def printc(*args, sep=' ', end='\n', file=None, flush=None, color=None):
+    if color is not None:
+        for s in color:
+            print(s, end='')
+    print(*args, sep=sep, end='', file=file, flush=flush)
+    if color is not None:
+        print(TerminalColors.NATIVE, end='', sep='')
+    print(end=end)
+
+
+def show_usage():
+    printc('bm', end='', color=TerminalColors.BOLD)
+    print(' - Bookmark for shell script')
+    print('Written by Mohammed Alkindi -', end='')
+    printc(' salkindi2009@hotmail.com', color=TerminalColors.BOLD)
+    print('Usage: bm [OPTIONS | MAIN_COMMAND | KEY]')
+    print('MAIN_COMMAND := {b | bookmark ,g | get ,d | delete,r | run ,l | list, s | show} where')
+    print('\t', end='')
+    printc('bookmark', end='', color=(TerminalColors.ORANGE, TerminalColors.BOLD))
+    print(' KEY VALUE\tInsert bookmark')
+    print('\t', end='')
+    printc('get ', end='', color=(TerminalColors.ORANGE, TerminalColors.BOLD))
+    print('KEY\t\t\tGet bookmark')
+    printc('\tdelete', end='', color=(TerminalColors.ORANGE, TerminalColors.BOLD))
+    print(' KEY\t\tDelete bookmark')
+    printc('\trun ', end='', color=(TerminalColors.ORANGE, TerminalColors.BOLD))
+    print('KEY ARGS[,...]\tRun bookmark in shell with args or not')
+    printc('\tlist', end='', color=(TerminalColors.BOLD, TerminalColors.ORANGE))
+    print('\t\t\tList all keys')
+    printc('\tshow', end='', color=(TerminalColors.ORANGE, TerminalColors.BOLD))
+    print(' [KEY]\t\tShow command')
+    print('OPTIONS := {[-v | --version], [-h | --help | -? | h]}')
+
+
+def key_format(i: str) -> str:
+    """
+    Format a string value into formatted value
+    whitespaces from string import are replaced with underscore dash (_) in tab and whitespace
+    and the rest as a null string ''
+
+    all punctuations from string import and all of them are replaced with underscore dash (_)
+    :param i: The string input
+    :return: Formatted string
+    """
+    v = i.replace('\t', '_')
+    v = v.replace('\n', '')
+    v = v.replace(' ', '_')
+    v = v.replace('\x0b', '')
+    v = v.replace('\x0c', '')
+    for punc in string.punctuation:
+        v = v.replace(punc, '_')
+    return v
+
+
+class JsonDb:
+    def __init__(self, lc):
+        _location = lc
+        if not os.path.exists(_location):
+            os.mkdir(_location)
+        self._bookmark_location = os.path.join(_location, 'bookmarks.json')
+        if not os.path.exists(self._bookmark_location):
+            fd = open(self._bookmark_location, 'w')
+            print('[]', file=fd)
+            fd.close()
+
+    def get_data(self):
+        fd = io.FileIO(self._bookmark_location)
+        rd = fd.readall()
+        fd.close()
+        return json.loads(str(rd, encoding='utf8'))
+
+    def set_data(self, d):
+        fd = io.FileIO(self._bookmark_location, 'w')
+        fd.write(bytes(json.dumps(d, indent=True), encoding='utf8'))
+        fd.close()
+
+    def erase(self):
+        fd = io.FileIO(self._bookmark_location, 'w+')
+        fd.truncate()
+        fd.close()
+
+
+def invalid_command(p):
+    printc('Misuse of argument %s, type h, -h, --help or -? for bm usage' % p,
+           color=(TerminalColors.BOLD, TerminalColors.RED))
+def list_keys(js):
+    data = js.get_data()
+    for entry in data:
+        key = entry.get('key')
+        value = ''
+        for v in entry.get('arguments'):
+            value+='%s ' % v
+        
+        print("%s=%s" % (entry.get('key'), value))
+
+# Parse arguments...
+arg = sys.argv
+arglen = sys.argv.__len__()
+storepath = os.path.join(os.path.expanduser('~'), '.bm')
+js = JsonDb(storepath)
+if arglen < 2:
+    list_keys(js)
+    sys.exit(0)
+
+arg1 = arg[1]
+if arg1.lower() == 'b' or arg1.lower() == "bookmark":
+    time_stamp = datetime.now().timestamp()
+    if arglen > 3:  # [KEY] [ARGS]
+        key = arg[2]
+        value = list(arg[3:])
+        d_value = {
+            'key': key,
+            'creation': time_stamp,
+            'arguments': value
+        }
+        json_data = js.get_data()
+        for entry in json_data:
+            if entry.get('key') == key:
+                printc('Entry name "', key, '" is exist', color=(TerminalColors.RED, TerminalColors.BOLD))
+                sys.exit(1)
+        if key.lower() in ('b','bookmark','g','get','d','delete','r','run','l','list','s','show'):
+            printc('Cannot add key "%s" because it must not be one of %s' % (key, ('b','bookmark','g','get','d','delete','r','run','l','list','s','show').__str__()),
+                   color=(TerminalColors.BOLD,TerminalColors.RED))
+            sys.exit(1)
+        json_data.append(d_value)
+        js.set_data(json_data)
+    else:
+        invalid_command(arg1)
+        print('Usage: b[ookmark] KEY ARGS[,...]')
+        sys.exit(1)
+elif arg1.lower() == 'g' or arg1.lower() == 'get':
+    if arglen == 3:
+        key = arg[2]
+        data = js.get_data()
+        value = None
+        for entry in data:
+            if entry.get('key') == key:
+                value = entry.get('arguments')
+                break
+        if value is None:
+            printc('No entry named "', key, '" exists', sep='', color=(TerminalColors.BOLD, TerminalColors.RED))
+            sys.exit(0)
+        for v in value:
+            print(v, end=' ')
+
+    else:
+        invalid_command(arg1)
+        print('Usage: g[et] KEY')
+        sys.exit(1)
+elif arg1.lower() == 'd' or arg1.lower() == "delete":
+    if arglen == 3:
+        key = arg[2]
+        data = js.get_data()
+        index = None
+        for entry in data:
+            if entry.get('key') == key:
+                index = data.index(entry)
+                break
+        if index is None:
+            printc('No entry named "%s"' % key,
+                   color=(TerminalColors.RED, TerminalColors.BOLD))
+            sys.exit(0)
+        data.pop(index)
+        js.set_data(data)
+    else:
+        invalid_command(arg1)
+        print('Usage: d[elete] KEY')
+elif arg1.lower() == 'r' or arg1.lower() == "run":
+    if arglen >= 3:
+        key = arg[2]
+        arguments = ''
+        if arglen > 3:
+            arguments = arg[3:]
+        data = js.get_data()
+        value = None
+        for entry in data:
+            if entry.get('key') == key:
+                value = entry['arguments']
+                break
+        if value is None:
+            printc('No entry named "', key, '" exists', sep='', color=(TerminalColors.BOLD, TerminalColors.RED))
+            sys.exit(1)
+        subprocess.Popen(value, stdout=sys.stdout, stdin=sys.stdin,
+                         stderr=sys.stderr).communicate()
+    else:
+        invalid_command(arg1)
+        print('Usage: r[un] KEY')
+elif arg1.lower() == 'l' or arg1.lower() == 'list':
+    list_keys(js)
+elif arg1.lower() == 's' or arg1.lower() == 'show':
+    if arglen == 3:
+        key = arg[2]
+        data = js.get_data()
+        value = None
+        for entry in data:
+            if entry.get('key') == key:
+                value = entry['arguments']
+                break
+        if value is None:
+            printc('No entry named "', key, '" exists', sep='', color=(TerminalColors.BOLD, TerminalColors.RED))
+            sys.exit(1)
+        for v in value:
+            print(v, end=' ')
+    else:
+        invalid_command(arg1)
+        print('Usage: s[how] KEY')
+elif arg1.lower() == 'h' or arg1.lower() == "-h" or arg1.lower() == '--help' or arg1.lower() == '-?':
+    show_usage()
+elif arg1 == '--version' or arg1 == '-v':
+    print(__version__)
+else:
+    if arglen >= 2:
+        key = arg[1]
+        arguments = ''
+        if arglen > 2:
+            arguments = arg[2:]
+        data = js.get_data()
+        value = None
+        for entry in data:
+            if entry.get('key') == key:
+                value = entry['arguments']
+                break
+        if value is None:
+            printc('No entry named "', key, '" exists', sep='', color=(TerminalColors.BOLD, TerminalColors.RED))
+            sys.exit(1)
+        subprocess.Popen(value, stdout=sys.stdout, stdin=sys.stdin,
+                         stderr=sys.stderr).communicate()
+    else:
+        invalid_command(arg1)
+        print('Usage: KEY')
+        
