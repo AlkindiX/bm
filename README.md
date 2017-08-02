@@ -13,9 +13,9 @@ Save all your daily basis command lines with bm easily
 | Argument            | Description                                                                   | Example                                   |
 | ------------------- | ------------------------------------                                          | ----------------------------------------- |
 | `bm b KEY ARGS,...` | Create a new bookmark with arguments                                          | `bm b ssh_myserver ssh root@192.168.0.5`  |
-| `bm KEY`            | Launch your favorite code                                                     | `bm ssh_myserver                          |
+| `bm KEY`            | Launch your favorite code                                                     | `bm ssh_myserver`                          |
 | `bm`                | List bookmarked command lines. Every line indicated a registered command line | Just write `bm`                           |
-| `bm r`              | Remove an exist bookmark                                                      | `bm r ssh_myserver`                       |
+| `bm r`              | Remove an exist bookmark                                                      | bm r ssh_myserver`                       |
 
 ## License
 This project is licensed under Apache 2.0 license
